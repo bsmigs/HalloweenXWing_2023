@@ -30,8 +30,12 @@ class Xwing:
         #    self.unmuted = True
     
     def play_song(self):
-        self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
-        self.media.play()
+        if (self.media.is_playing()):
+            # don't want to do anything if something already playing
+            return
+        else:
+            self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
+            self.media.play()
 #        self.check_play_status()
 
     def _check_play_status(self):
