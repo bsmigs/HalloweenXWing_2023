@@ -42,11 +42,6 @@ void turn_off_servo()
   pwm.setPWM(servonum, 0, 4096);
 }
 
-void rotate(int time)
-{
-  
-}
-
 void loop() 
 {
 
@@ -84,7 +79,7 @@ void loop()
         if (random_num == 0)
         {
           // choose a random value to rotate in time
-          random_time_us = random(600, time_midpoint_us);
+          random_time_us = random(USMIN, time_midpoint_us);
         }
         else if (random_num == 1)
         {
