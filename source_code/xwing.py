@@ -29,6 +29,22 @@ class Xwing:
         # initialize R2D2 sounds media player
         self.r2d2 = vlc.MediaPlayer()
 
+        # load correct LCD pins (as GPIO.BOARD = physical pin numbering)
+        self.lcd_rs = 25
+        self.lcd_en = 24
+        self.lcd_d4 = 23
+        self.lcd_d5 = 29
+        self.lcd_d6 = 31
+        self.lcd_d7 = 33
+        self.lcd_backlight = 4
+        self.lcd_columns = 16
+        self.lcd_rows = 2
+
+        # initialize the LCD using the pins
+        #self.lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,
+        #                                lcd_columns, lcd_rows, lcd_backlight)
+        #self.lcd.message('Hello world!')
+
         #if (not self.unmuted):
         #    os.system('dtoverlay=rpi-digiampplus,unmute_amp')
         #    os.system('dtoverlay=iqaudio-digiampplus,unmute_amp')

@@ -6,8 +6,9 @@ import random
 #import soundfile as sf
 #import simpleaudio as sa
 import os
-import keyboard
+from pynput import keyboard
 from xwing import Xwing
+
 
 # define bounce time
 BOUNCETIME = 300 # (ms)
@@ -25,11 +26,11 @@ t_gunStart = 0
 t_engineStart = 0
 t_r2d2Start = 0
 
-# load xwing module I made
-xwing = Xwing("pi")
-
 # track if the song started or stopped
 music_state = "resume"
+
+# load xwing module I made
+xwing = Xwing("pi")
 
 def getSoundsDurations(path_to_files):
     sounds = os.listdir(path_to_files)
@@ -51,12 +52,68 @@ cc = random.randint(0, len(cookieSounds)-1)
 hh = random.randint(0, len(hornSounds)-1)
 '''
 
+print(f"music_state = {music_state}")
+
+def on_press(key):
+    try:
+        print(f"key {key.char} pressed")
+    except AttributeError:
+        print(f"special key {key} pressed")
+
+def on_release(key):
+    # Had to make this a global variable b/c what I think
+    # is going on is that the thread executing this function
+    # lost the scope of music_state. With it now as a
+    # global variable it remembers it
+    global music_state
+    print(f"music_state = {music_state}")
+
+    #print(f"key {key} released")
+    if key == keyboard.KeyCode(char="8"):
+        # raise the volume by +10
+        print(f"Increasing volume by +10")
+        vol = xwing.get_volume()
+        vol += 10
+        xwing.set_volume(vol)
+    elif key == keyboard.KeyCode(char="2"):
+        # lower the volume by -10
+        vol = xwing.get_volume()
+        vol -= 10
+        xwing.set_volume(vol)
+        print(f"Decreasing volume by -10")
+    elif key == keyboard.Key.enter:
+        # play the current song
+        xwing.play_song()
+    elif key == keyboard.KeyCode(char="4"):
+        # play the previous song
+        xwing.previous_song()
+    elif key == keyboard.KeyCode(char="6"):
+        # pay the next song
+        xwing.next_song()
+    elif key == keyboard.KeyCode(char="0"):
+        # stop playing any song
+        xwing.stop_song()
+    elif key == keyboard.KeyCode(char="5"):
+        # if the music is initially playing
+        # then pause it. If it's paused, then
+        # resume playing
+        if (music_state == "resume"):
+            xwing.pause_song()
+            music_state = "pause"
+        elif (music_state == "pause"):
+            xwing.resume_song()
+            music_state = "resume"
+
+
 # use physical pin numbering
 GPIO.setmode(GPIO.BOARD)
 
 GPIO.setup(gunButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(engineButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(r2d2ButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+listener.start()
 
 try:
     print(GPIO.VERSION) 
@@ -81,35 +138,6 @@ try:
             hh = (hh + 1) % len(hornSounds)
         '''
 
-        if keyboard.read_key() == "8":
-            vol = xwing.get_volume()
-            vol += 10
-            xwing.set_volume(vol)
-
-        if keyboard.read_key() == "2":
-            vol = xwing.get_volume()
-            vol -= 10
-            xwing.set_volume()
-
-        if keyboard.read_key() == "6":
-            xwing.next_song()
-
-        if keyboard.read_key() == "4":
-            xwing.previous_song()
-
-        if keyboard.read_key() == "5":
-            if (music_state == "start"):
-                xwing.pause_song()
-                music_state = "pause"
-            elif (music_state == "pause"):
-                xwing.resume_song()
-                music_state = "start"
-
-        if keyboard.read_key() == "enter":
-            xwing.play_song()
-
-        if keyboard.read_key() == "0":
-            xwing.stop_song()
-
 except KeyboardInterrupt:
     GPIO.cleanup()
+    listener.join()
