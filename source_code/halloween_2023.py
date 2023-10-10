@@ -45,14 +45,14 @@ def getSoundsDurations(path_to_files):
     return sounds, durations
    
 '''
-cookieSounds, cookieSoundsDurations = getSoundsDurations("wav_files")
-hornSounds, hornSoundsDurations = getSoundsDurations("horn_sounds")
+r2d2Sounds, r2d2SoundsDurations = getSoundsDurations("r2d2_sounds")
+gunSounds, gunSoundsDurations = getSoundsDurations("gun_sounds")
+engineSounds, engineSoundsDurations = getSoundDurations("engine_sounds")
 
-cc = random.randint(0, len(cookieSounds)-1)
-hh = random.randint(0, len(hornSounds)-1)
+rr = random.randint(0, len(r2d2Sounds)-1)
+gg = random.randint(0, len(gunSounds)-1)
+ee = random.randint(0, len(engineSounds)-1)
 '''
-
-print(f"music_state = {music_state}")
 
 def on_press(key):
     try:
@@ -66,7 +66,6 @@ def on_release(key):
     # lost the scope of music_state. With it now as a
     # global variable it remembers it
     global music_state
-    print(f"music_state = {music_state}")
 
     #print(f"key {key} released")
     if key == keyboard.KeyCode(char="8"):
@@ -116,26 +115,33 @@ listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 listener.start()
 
 try:
-    print(GPIO.VERSION) 
-    #GPIO.add_event_detect(headlightButtonPin, GPIO.RISING, callback=toggleHeadlights, bouncetime=BOUNCETIME)
+    #print(GPIO.VERSION) 
     
     while True:
         '''
-        if (GPIO.input(cookieSoundsButtonPin)==GPIO.LOW) and (time.time() - t_cookieStart) > vtc_cookie:
-            vtc_cookie = cookieSoundsDurations[cc]
-            t_cookieStart = time.time()
-            wave_obj = sa.WaveObject.from_wave_file("wav_files/"+cookieSounds[cc])
+        if (GPIO.input(gunButtonPin)==GPIO.LOW) and (time.time() - t_gunStart) > vtc_gun:
+            vtc_gun = gunSoundsDurations[gg]
+            t_gunStart = time.time()
+            wave_obj = sa.WaveObject.from_wave_file("gun_sounds/"+gunSounds[gg])
             play_obj = wave_obj.play()
             play_obj.wait_done()
-            cc = (cc + 1) % len(cookieSounds)
+            gg = (gg + 1) % len(gunSounds)
 
-        if (GPIO.input(hornButtonPin)==GPIO.LOW) and (time.time() - t_hornStart) > vtc_horn:
-            vtc_horn = hornSoundsDurations[hh]
-            t_hornStart = time.time()
-            wave_obj = sa.WaveObject.from_wave_file("horn_sounds/"+hornSounds[hh])
+        if (GPIO.input(engineButtonPin)==GPIO.LOW) and (time.time() - t_engineStart) > vtc_engine:
+            vtc_engine = engineSoundsDurations[hh]
+            t_engineStart = time.time()
+            wave_obj = sa.WaveObject.from_wave_file("engine_sounds/"+engineSounds[ee])
             play_obj = wave_obj.play()
             play_obj.wait_done()
-            hh = (hh + 1) % len(hornSounds)
+            ee = (ee + 1) % len(engineSounds)
+
+        if (GPIO.input(r2d2ButtonPin)==GPIO.LOW) and (time.time() - t_r2d2Start) > vtc_r2d2:
+            vtc_r2d2 = r2d2SoundsDurations[rr]
+            t_r2d2Start = time.time()
+            wave_obj = sa.WaveObject.from_wave_file("r2d2_sounds/"+r2d2Sounds[rr])
+            play_obj = wave_obj.play()
+            play_obj.wait_done()
+            rr = (rr + 1) % len(r2d2Sounds)
         '''
 
 except KeyboardInterrupt:

@@ -57,6 +57,9 @@ class Xwing:
         else:
             self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
             self.media.play()
+            ### TO DO:
+            # After a song is done playing, it loops back around again
+            # so I want to make sure it stops when the song is over
 
     def pause_song(self):
         # any non-zero value pauses it
