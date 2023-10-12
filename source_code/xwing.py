@@ -8,47 +8,39 @@ import os
 import vlc
 import numpy as np
 import time
+from RPLCD.gpio import CharLCD
+import RPi.GPIO as GPIO
 
 class Xwing:
     
-    def __init__(self, runtime_loc):
-        # make sure DigiAmp+ is unmuted
-        self.unmuted = False
+    def __init__(self, label):
         self.song_playing = False
-        if (runtime_loc == "pi"):
+
+        # make sure DigiAmp+ is unmuted
+        if (label == "music"):
+            #self.unmuted = False
             self.path = "/home/pi/repos/HalloweenXWing_2023/Empire_Strikes_Back_Soundtrack"
-        elif (runtime_loc == "home"):
-            self.path = "C:/Users/bsmig/Documents/repos/HalloweenXWing_2023/Empire_Strikes_Back_Soundtrack"
-        self.music_list = os.listdir(self.path)
-        print(f"there are {len(self.music_list)} songs")
-        self.counter = 0
+            self.music_list = os.listdir(self.path)
+            print(f"there are {len(self.music_list)} songs")
+            self.counter = 0
 
-        # initialize empty constructor so I don't have to use play_song as very first command ever run
-        self.media = vlc.MediaPlayer()       
+            # initialize empty constructor so I don't have to use play_song as very first command ever run
+            self.media = vlc.MediaPlayer()      
 
-        # initialize R2D2 sounds media player
-        self.r2d2 = vlc.MediaPlayer()
+			#if (not self.unmuted):
+            #    os.system('dtoverlay=rpi-digiampplus,unmute_amp')
+            #    os.system('dtoverlay=iqaudio-digiampplus,unmute_amp')
+            #    self.unmuted = True 
 
-        # load correct LCD pins (as GPIO.BOARD = physical pin numbering)
-        self.lcd_rs = 25
-        self.lcd_en = 24
-        self.lcd_d4 = 23
-        self.lcd_d5 = 29
-        self.lcd_d6 = 31
-        self.lcd_d7 = 33
-        self.lcd_backlight = 4
-        self.lcd_columns = 16
-        self.lcd_rows = 2
-
-        # initialize the LCD using the pins
-        #self.lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,
-        #                                lcd_columns, lcd_rows, lcd_backlight)
-        #self.lcd.message('Hello world!')
-
-        #if (not self.unmuted):
-        #    os.system('dtoverlay=rpi-digiampplus,unmute_amp')
-        #    os.system('dtoverlay=iqaudio-digiampplus,unmute_amp')
-        #    self.unmuted = True
+            
+        elif (label == "r2d2"):
+            self.path = "/home/pi/repos/HalloweenXWing_2023/r2d2_sounds_mp3s"
+            self.music_list = os.listdir(self.path)
+            print(f"there are {len(self.music_list)} R2D2 sounds")
+            self.counter = 0
+            
+            # initialize R2D2 sounds media player
+            self.media = vlc.MediaPlayer()
     
     def play_song(self):
         if (self.media.is_playing()):
@@ -56,10 +48,33 @@ class Xwing:
             return
         else:
             self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
+            
+            ### TRYING THIS OUT
+            #self.media.set_media(self.path+"/"+self.music_list[self.counter])
+            
             self.media.play()
+            self.media.audio_set_volume(50)
             ### TO DO:
             # After a song is done playing, it loops back around again
             # so I want to make sure it stops when the song is over
+
+    def is_playing(self):
+        return self.media.is_playing()
+
+    def release(self):
+        self.media.release()
+
+    def is_song_over(self):
+        if (self.media.get_state() == vlc.State.Ended):
+            self.media.release()
+            return True
+        else:
+            return False
+
+    def increase_counter(self):
+        self.counter += 1
+        if (self.counter >= len(self.music_list)):
+            self.counter = np.mod(self.counter, len(self.music_list))
 
     def pause_song(self):
         # any non-zero value pauses it
@@ -97,7 +112,7 @@ class Xwing:
 
     def get_volume(self):
         return self.media.audio_get_volume()
-        
+       
     
         
         

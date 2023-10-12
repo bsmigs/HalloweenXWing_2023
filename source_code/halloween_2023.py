@@ -1,14 +1,14 @@
+from RPLCD.gpio import CharLCD
 import RPi.GPIO as GPIO
 from signal import pause
 import time
 import math
 import random
-#import soundfile as sf
-#import simpleaudio as sa
+import threading
 import os
+import numpy as np
 from pynput import keyboard
 from xwing import Xwing
-
 
 # define bounce time
 BOUNCETIME = 300 # (ms)
@@ -26,33 +26,14 @@ t_gunStart = 0
 t_engineStart = 0
 t_r2d2Start = 0
 
+# define lcd counter
+lcd_counter = 10000
+
 # track if the song started or stopped
 music_state = "resume"
 
 # load xwing module I made
-xwing = Xwing("pi")
-
-def getSoundsDurations(path_to_files):
-    sounds = os.listdir(path_to_files)
-    durations = []
-    for file in sounds:
-        f = sf.SoundFile(path_to_files+"/"+file)
-        samples = len(f)
-        sampleRate = f.samplerate
-        duration = math.ceil(samples/sampleRate)
-        durations.append(duration)
-    
-    return sounds, durations
-   
-'''
-r2d2Sounds, r2d2SoundsDurations = getSoundsDurations("r2d2_sounds")
-gunSounds, gunSoundsDurations = getSoundsDurations("gun_sounds")
-engineSounds, engineSoundsDurations = getSoundDurations("engine_sounds")
-
-rr = random.randint(0, len(r2d2Sounds)-1)
-gg = random.randint(0, len(gunSounds)-1)
-ee = random.randint(0, len(engineSounds)-1)
-'''
+xwing = Xwing("music")
 
 def on_press(key):
     try:
@@ -83,6 +64,7 @@ def on_release(key):
     elif key == keyboard.Key.enter:
         # play the current song
         xwing.play_song()
+        music_state = "resume"
     elif key == keyboard.KeyCode(char="4"):
         # play the previous song
         xwing.previous_song()
@@ -91,7 +73,9 @@ def on_release(key):
         xwing.next_song()
     elif key == keyboard.KeyCode(char="0"):
         # stop playing any song
-        xwing.stop_song()
+        if (music_state != "stop"):
+            xwing.stop_song()
+            music_state = "stop"
     elif key == keyboard.KeyCode(char="5"):
         # if the music is initially playing
         # then pause it. If it's paused, then
@@ -103,47 +87,104 @@ def on_release(key):
             xwing.resume_song()
             music_state = "resume"
 
+def activate_range_counter(lcd_counter):
+    # Make the top row of the LCD say "Range (km)"
+    # Make the bottom row be a rapidly decreasing counter
+	# such that when it hits 0, it wraps back around
+	# again at the highest starting value
+	lcd.clear()
+	lcd.cursor_pos = (0,1)
+	lcd.write_string(u'Target Range')
+	lcd.lf()
+	lcd.cursor_pos = (1,5)
+	value = f'{lcd_counter}'
+	if (lcd_counter == 10000):
+		lcd.write_string(value)
+	elif (lcd_counter < 10000 and lcd_counter >= 1000):
+		lcd.write_string(value+' m')
+	elif (lcd_counter < 1000 and lcd_counter >= 100):
+		lcd.write_string(value+' m ')
+	elif (lcd_counter < 100 and lcd_counter >= 10):
+		lcd.write_string(value+' m  ')
+	elif (lcd_counter < 10 and lcd_counter >= 1):
+		lcd.write_string(value+' m   ')
+	elif (lcd_counter == 0):
+		lcd.write_string(u'BOOM!!!')
+	#time.sleep(10)
+	lcd_counter -= 1
+	lcd_counter = np.mod(lcd_counter, 10000)
+
+	return lcd_counter
+
+def play_r2d2_sounds(instance_number):
+    xwing = Xwing("r2d2")
+    first_time_thru = True
+    while True:
+        # this simulates a user pushing the button
+        was_button_pushed = random.randint(0, 50)
+        #print(f"random num = {was_button_pushed}")
+
+        if (was_button_pushed == 1 and first_time_thru):
+            xwing.play_song()
+            first_time_thru = False
+            #print("FIRST TIME THRU")
+        else:
+            if (was_button_pushed == 1 and xwing.is_song_over()):
+                xwing.increase_counter()
+                xwing.play_song()
+                #print("INCREMENTED SONG")
+            #else:
+                #print("WAITING FOR SONG TO END")
+                
+        time.sleep(0.1)
+
+
+# define threads to use so I can layer sounds on top of music
+threads = []
+thread = threading.Thread(target=play_r2d2_sounds, args=(0,))
+threads.append(thread)
+thread.start()
+
 
 # use physical pin numbering
 GPIO.setmode(GPIO.BOARD)
-
+# initialize GPIO pins
 GPIO.setup(gunButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(engineButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(r2d2ButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
+# load correct LCD pins (as GPIO.BOARD = physical pin numbering)
+# Cannot use physical pin 15 (GPIO22) since this is used by DigiAmp+
+rs = 13
+e  = 16
+d4 = 19
+d5 = 21
+d6 = 23
+d7 = 24
+columns = 16
+rows = 2
+
+# initialize the LCD using the pins
+lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
+lcd.clear()
+
+# setup the keyboard and be prepared to listen for user input
 listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 listener.start()
 
 try:
-    #print(GPIO.VERSION) 
+    print(f"GPIO version = {GPIO.VERSION}") 
     
     while True:
-        '''
-        if (GPIO.input(gunButtonPin)==GPIO.LOW) and (time.time() - t_gunStart) > vtc_gun:
-            vtc_gun = gunSoundsDurations[gg]
-            t_gunStart = time.time()
-            wave_obj = sa.WaveObject.from_wave_file("gun_sounds/"+gunSounds[gg])
-            play_obj = wave_obj.play()
-            play_obj.wait_done()
-            gg = (gg + 1) % len(gunSounds)
-
-        if (GPIO.input(engineButtonPin)==GPIO.LOW) and (time.time() - t_engineStart) > vtc_engine:
-            vtc_engine = engineSoundsDurations[hh]
-            t_engineStart = time.time()
-            wave_obj = sa.WaveObject.from_wave_file("engine_sounds/"+engineSounds[ee])
-            play_obj = wave_obj.play()
-            play_obj.wait_done()
-            ee = (ee + 1) % len(engineSounds)
-
-        if (GPIO.input(r2d2ButtonPin)==GPIO.LOW) and (time.time() - t_r2d2Start) > vtc_r2d2:
-            vtc_r2d2 = r2d2SoundsDurations[rr]
-            t_r2d2Start = time.time()
-            wave_obj = sa.WaveObject.from_wave_file("r2d2_sounds/"+r2d2Sounds[rr])
-            play_obj = wave_obj.play()
-            play_obj.wait_done()
-            rr = (rr + 1) % len(r2d2Sounds)
-        '''
+        # run the target range LCD
+        lcd_counter = activate_range_counter(lcd_counter)
+        time.sleep(0.05)
 
 except KeyboardInterrupt:
     GPIO.cleanup()
     listener.join()
+    lcd.clear()
+    for thread in threads:
+        thread.join()
+
+
