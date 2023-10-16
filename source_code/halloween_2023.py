@@ -14,23 +14,43 @@ from xwing import Xwing
 BOUNCETIME = 300 # (ms)
 
 # define button pins
-gunButtonPin = 18
-engineButtonPin = 29
-r2d2ButtonPin = 11
+r2d2ButtonPin = 36
+gunButtonPin = 37
+engineButtonPin = 38
+
+# use physical pin numbering
+GPIO.setmode(GPIO.BOARD)
+# initialize GPIO pins
+GPIO.setup(r2d2ButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(gunButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(engineButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+lastR2D2ButtonState = GPIO.LOW
+lastGunButtonState = GPIO.LOW
+lastEngineButtonState = GPIO.LOW
 
 # default values
-vtc_gun = 0
-vtc_engine = 0
-vtc_r2d2 = 0
-t_gunStart = 0
-t_engineStart = 0
-t_r2d2Start = 0
+lastTimeGunButtonPressed = 0
+lastTimeEngineButtonPressed = 0
+lastTimeR2D2ButtonPressed = 0
 
 # define lcd counter
 lcd_counter = 10000
 
 # track if the song started or stopped
 music_state = "resume"
+
+# load correct LCD pins (as GPIO.BOARD = physical pin numbering)
+# Cannot use physical pin 15 (GPIO22) since this is used by DigiAmp+
+rs = 13
+e  = 16
+d4 = 19
+d5 = 21
+d6 = 23
+d7 = 24
+columns = 16
+rows = 2
+
 
 # load xwing module I made
 xwing = Xwing("music")
@@ -116,64 +136,102 @@ def activate_range_counter(lcd_counter):
 
 	return lcd_counter
 
+'''
 def play_r2d2_sounds(instance_number):
     xwing = Xwing("r2d2")
     first_time_thru = True
     while True:
         # this simulates a user pushing the button
         was_button_pushed = random.randint(0, 50)
-        #print(f"random num = {was_button_pushed}")
+        if (was_button_pushed):
+			#print(f"random num = {was_button_pushed}")
 
-        if (was_button_pushed == 1 and first_time_thru):
-            xwing.play_song()
-            first_time_thru = False
-            #print("FIRST TIME THRU")
-        else:
-            if (was_button_pushed == 1 and xwing.is_song_over()):
-                xwing.increase_counter()
-                xwing.play_song()
-                #print("INCREMENTED SONG")
-            #else:
-                #print("WAITING FOR SONG TO END")
+			if (first_time_thru):
+			    xwing.play_song()
+			    first_time_thru = False
+			    #print("FIRST TIME THRU")
+			else:
+			    if (xwing.is_song_over()):
+			        xwing.increase_counter()
+			        xwing.play_song()
+			        #print("INCREMENTED SONG")
+			    #else:
+			        #print("WAITING FOR SONG TO END")
+                
+        time.sleep(0.1)
+'''
+
+def play_sounds(instance_number):
+    if (instance_number == 0):
+        global lastR2D2ButtonState
+        global lastTimeR2D2ButtonPressed
+        lastButtonState = lastR2D2ButtonState
+        lastTimeButtonPressed = lastTimeR2D2ButtonPressed
+        buttonPin = r2d2ButtonPin
+        xwing = Xwing("r2d2")
+    elif (instance_number == 1):
+        global lastGunButtonState
+        global lastTimeGunButtonPressed
+        lastButtonState = lastGunButtonState
+        lastTimeButtonPressed = lastTimeGunButtonPressed
+        buttonPin = gunButtonPin
+        xwing = Xwing("gun")
+    elif (instance_number == 2):
+        global lastEngineButtonState
+        global lastTimeEngineButtonPressed
+        lastButtonState = lastEngineButtonState
+        lastTimeButtonPressed = lastTimeEngineButtonPressed
+        buttonPin = gunButtonPin
+        xwing = Xwing("engine")
+
+    # logic below is generic
+    first_time_thru = True
+    while True:
+        buttonState = GPIO.input(buttonPin)
+        # see if bouncetime expired
+        if (time.time() - lastTimeButtonPressed > BOUNCETIME):
+            # if greater than bounce time, make sure some action occurred
+            if (buttonState != lastButtonState):
+                # if an action occurred, log the last time it happened
+                lastTimeButtonStateChanged = time.time()
+                lastButtonState = buttonState
+
+                # only do something non-trivial if the button was pushed
+                if (buttonState == GPIO.HIGH):
+                    if (first_time_thru):
+                        xwing.play_song()
+                        first_time_thru = False
+			            #print("FIRST TIME THRU")
+                    else:
+                        if (xwing.is_song_over()):
+                            xwing.increase_counter()
+                            xwing.play_song()
+			                #print("INCREMENTED SONG")
+			            #else:
+			                #print("WAITING FOR SONG TO END")
                 
         time.sleep(0.1)
 
 
-# define threads to use so I can layer sounds on top of music
-threads = []
-thread = threading.Thread(target=play_r2d2_sounds, args=(0,))
-threads.append(thread)
-thread.start()
-
-
-# use physical pin numbering
-GPIO.setmode(GPIO.BOARD)
-# initialize GPIO pins
-GPIO.setup(gunButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(engineButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(r2d2ButtonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# load correct LCD pins (as GPIO.BOARD = physical pin numbering)
-# Cannot use physical pin 15 (GPIO22) since this is used by DigiAmp+
-rs = 13
-e  = 16
-d4 = 19
-d5 = 21
-d6 = 23
-d7 = 24
-columns = 16
-rows = 2
-
-# initialize the LCD using the pins
-lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
-lcd.clear()
-
-# setup the keyboard and be prepared to listen for user input
-listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-listener.start()
-
 try:
     print(f"GPIO version = {GPIO.VERSION}") 
+	#GPIO.add_event_detect(r2d2ButtonPin, GPIO.RISING, callback=play_r2d2_sounds, bouncetime=BOUNCETIME)
+    #GPIO.add_event_detect(gunButtonPin, GPIO.RISING, callback=play_gun_sounds, bouncetime=BOUNCETIME)
+    #GPIO.add_event_detect(engineButtonPin, GPIO.RISING, callback=play_engine_sounds, bouncetime=BOUNCETIME)
+
+	# define threads to use so I can layer sounds on top of music
+    threads = []
+    thread = threading.Thread(target=play_sounds, args=(0,))
+    threads.append(thread)
+    thread.start()
+
+	# initialize the LCD using the pins
+    lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
+    lcd.clear()
+
+	# setup the keyboard and be prepared to listen for user input
+    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener.start()
     
     while True:
         # run the target range LCD
