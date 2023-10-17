@@ -181,7 +181,7 @@ def play_sounds(instance_number):
         global lastTimeEngineButtonPressed
         lastButtonState = lastEngineButtonState
         lastTimeButtonPressed = lastTimeEngineButtonPressed
-        buttonPin = gunButtonPin
+        buttonPin = engineButtonPin
         xwing = Xwing("engine")
 
     # logic below is generic
@@ -215,15 +215,13 @@ def play_sounds(instance_number):
 
 try:
     print(f"GPIO version = {GPIO.VERSION}") 
-	#GPIO.add_event_detect(r2d2ButtonPin, GPIO.RISING, callback=play_r2d2_sounds, bouncetime=BOUNCETIME)
-    #GPIO.add_event_detect(gunButtonPin, GPIO.RISING, callback=play_gun_sounds, bouncetime=BOUNCETIME)
-    #GPIO.add_event_detect(engineButtonPin, GPIO.RISING, callback=play_engine_sounds, bouncetime=BOUNCETIME)
-
-	# define threads to use so I can layer sounds on top of music
+	
+    # define threads to use so I can layer sounds on top of music
     threads = []
-    thread = threading.Thread(target=play_sounds, args=(0,))
-    threads.append(thread)
-    thread.start()
+    for ii in range(0,3):
+        thread = threading.Thread(target=play_sounds, args=(ii,))
+        threads.append(thread)
+        thread.start()
 
 	# initialize the LCD using the pins
     lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])

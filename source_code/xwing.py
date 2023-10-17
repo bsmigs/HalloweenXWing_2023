@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Sep 24 19:54:55 2023
-
-@author: bsmig
-"""
 import os
 import vlc
 import numpy as np
@@ -14,33 +8,31 @@ import RPi.GPIO as GPIO
 class Xwing:
     
     def __init__(self, label):
+        self.label = label
         self.song_playing = False
-
-        # make sure DigiAmp+ is unmuted
         if (label == "music"):
+            # make sure DigiAmp+ is unmuted
             #self.unmuted = False
             self.path = "/home/pi/repos/HalloweenXWing_2023/Empire_Strikes_Back_Soundtrack"
-            self.music_list = os.listdir(self.path)
-            print(f"there are {len(self.music_list)} songs")
-            self.counter = 0
-
-            # initialize empty constructor so I don't have to use play_song as very first command ever run
-            self.media = vlc.MediaPlayer()      
-
 			#if (not self.unmuted):
             #    os.system('dtoverlay=rpi-digiampplus,unmute_amp')
             #    os.system('dtoverlay=iqaudio-digiampplus,unmute_amp')
             #    self.unmuted = True 
-
-            
         elif (label == "r2d2"):
             self.path = "/home/pi/repos/HalloweenXWing_2023/r2d2_sounds_mp3s"
-            self.music_list = os.listdir(self.path)
-            print(f"there are {len(self.music_list)} R2D2 sounds")
-            self.counter = 0
-            
-            # initialize R2D2 sounds media player
-            self.media = vlc.MediaPlayer()
+        elif (label == "gun"):
+            self.path = "/home/pi/repos/HalloweenXWing_2023/gun_sounds_mp3s"
+        elif (label == "engine"):
+            self.path = "/home/pi/repos/HalloweenXWing_2023/engine_sounds_mp3s"
+
+        self.music_list = os.listdir(self.path)
+        print(f"there are {len(self.music_list)} sounds or music")
+
+        # set sounds/music counter = 0 initially
+        self.counter = 0
+
+        # initialize empty constructor so I don't have to use play_song as very first command ever ru
+        self.media = vlc.MediaPlayer()
     
     def play_song(self):
         if (self.media.is_playing()):
@@ -48,10 +40,6 @@ class Xwing:
             return
         else:
             self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
-            
-            ### TRYING THIS OUT
-            #self.media.set_media(self.path+"/"+self.music_list[self.counter])
-            
             self.media.play()
             self.media.audio_set_volume(50)
             ### TO DO:
