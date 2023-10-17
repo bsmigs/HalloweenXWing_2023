@@ -136,30 +136,6 @@ def activate_range_counter(lcd_counter):
 
 	return lcd_counter
 
-'''
-def play_r2d2_sounds(instance_number):
-    xwing = Xwing("r2d2")
-    first_time_thru = True
-    while True:
-        # this simulates a user pushing the button
-        was_button_pushed = random.randint(0, 50)
-        if (was_button_pushed):
-			#print(f"random num = {was_button_pushed}")
-
-			if (first_time_thru):
-			    xwing.play_song()
-			    first_time_thru = False
-			    #print("FIRST TIME THRU")
-			else:
-			    if (xwing.is_song_over()):
-			        xwing.increase_counter()
-			        xwing.play_song()
-			        #print("INCREMENTED SONG")
-			    #else:
-			        #print("WAITING FOR SONG TO END")
-                
-        time.sleep(0.1)
-'''
 
 def play_sounds(instance_number):
     if (instance_number == 0):
