@@ -7,8 +7,10 @@ import random
 import threading
 import os
 import numpy as np
-from pynput import keyboard
 from xwing import Xwing
+#from pynput import keyboard
+#from sshkeyboard import listen_keyboard, stop_listening
+from evdev import InputDevice, list_devices, categorize, ecodes
 
 # define bounce time
 BOUNCETIME = 300 # (ms)
@@ -55,57 +57,45 @@ rows = 2
 # load xwing module I made
 xwing = Xwing("music")
 
-def on_press(key):
-    try:
-        print(f"key {key.char} pressed")
-    except AttributeError:
-        print(f"special key {key} pressed")
-
-def on_release(key):
-    # Had to make this a global variable b/c what I think
-    # is going on is that the thread executing this function
-    # lost the scope of music_state. With it now as a
-    # global variable it remembers it
-    global music_state
-
-    #print(f"key {key} released")
-    if key == keyboard.KeyCode(char="8"):
-        # raise the volume by +10
-        print(f"Increasing volume by +10")
-        vol = xwing.get_volume()
-        vol += 10
-        xwing.set_volume(vol)
-    elif key == keyboard.KeyCode(char="2"):
-        # lower the volume by -10
-        vol = xwing.get_volume()
-        vol -= 10
-        xwing.set_volume(vol)
-        print(f"Decreasing volume by -10")
-    elif key == keyboard.Key.enter:
-        # play the current song
-        xwing.play_song()
-        music_state = "resume"
-    elif key == keyboard.KeyCode(char="4"):
-        # play the previous song
-        xwing.previous_song()
-    elif key == keyboard.KeyCode(char="6"):
-        # pay the next song
-        xwing.next_song()
-    elif key == keyboard.KeyCode(char="0"):
-        # stop playing any song
-        if (music_state != "stop"):
-            xwing.stop_song()
-            music_state = "stop"
-    elif key == keyboard.KeyCode(char="5"):
-        # if the music is initially playing
-        # then pause it. If it's paused, then
-        # resume playing
-        if (music_state == "resume"):
-            xwing.pause_song()
-            music_state = "pause"
-        elif (music_state == "pause"):
-            xwing.resume_song()
-            music_state = "resume"
+def take_external_keypad_input():
+    devices = [InputDevice(fn) for fn in list_devices()]
+    keypad = devices[0]
+    print(f"Found external keypad device {keypad.name}")
+    for event in keypad.read_loop():
+        if event.type == ecodes.EV_KEY:
+            key_event = categorize(event)
+            if key_event.keystate == key_event.key_down:
+                print(f"Pressed key: {key_event.keycode}")
+            elif key_event.keystate == key_event.key_up:
+                print(f"Released key: {key_event.keycode}")
+                if (key_event.keycode == "KEY_KPENTER"):
+                    xwing.play_song()
+                    music_state = "resume"
+                elif (key_event.keycode == "KEY_KP0"):
+                    if (music_state != "stop"):
+                        xwing.stop_song()
+                        music_state = "stop"
+                elif (key_event.keycode == "KEY_KP8"):
+                    print(f"Increasing volume by +10")
+                    vol = xwing.get_volume()
+                    vol += 10
+                    xwing.set_volume(vol)
+                elif (key_event.keycode == "KEY_KP2"):
+                    print(f"Decreasing volume by -10")
+                    vol = xwing.get_volume()
+                    vol -= 10
+                    xwing.set_volume(vol)
+                elif (key_event.keycode == "KEY_KP4"):
+                    xwing.previous_song()
+                elif (key_event.keycode == "KEY_KP6"):
+                    xwing.next_song()
+                elif (key_event.keycode == "KEY_KP5"):
+                    if (music_state == "resume"):
+                        xwing.pause_song()
+                        music_state = "pause"
+                    elif (music_state == "pause"):
+                        xwing.resume_song()
+                        music_state = "resume"
 
 def activate_range_counter(lcd_counter):
     # Make the top row of the LCD say "Range (km)"
@@ -177,12 +167,12 @@ def play_sounds(instance_number):
                     if (first_time_thru):
                         xwing.play_song()
                         first_time_thru = False
-			            #print("FIRST TIME THRU")
+                        print("FIRST TIME THRU")
                     else:
                         if (xwing.is_song_over()):
                             xwing.increase_counter()
                             xwing.play_song()
-			                #print("INCREMENTED SONG")
+                            print("INCREMENTED SONG")
 			            #else:
 			                #print("WAITING FOR SONG TO END")
                 
@@ -191,7 +181,7 @@ def play_sounds(instance_number):
 
 try:
     print(f"GPIO version = {GPIO.VERSION}") 
-	
+
     # define threads to use so I can layer sounds on top of music
     threads = []
     for ii in range(0,3):
@@ -204,17 +194,18 @@ try:
     lcd.clear()
 
 	# setup the keyboard and be prepared to listen for user input
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-    listener.start()
-    
+    #take_external_keypad_input()
+    thread = threading.Thread(target=take_external_keypad_input)
+    threads.append(thread)
+    thread.start()
+
     while True:
         # run the target range LCD
         lcd_counter = activate_range_counter(lcd_counter)
-        time.sleep(0.05)
+        time.sleep(0.15)
 
 except KeyboardInterrupt:
     GPIO.cleanup()
-    listener.join()
     lcd.clear()
     for thread in threads:
         thread.join()

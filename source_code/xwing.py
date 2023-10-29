@@ -4,6 +4,7 @@ import numpy as np
 import time
 from RPLCD.gpio import CharLCD
 import RPi.GPIO as GPIO
+import threading
 
 class Xwing:
     
@@ -31,9 +32,10 @@ class Xwing:
         # set sounds/music counter = 0 initially
         self.counter = 0
 
-        # initialize empty constructor so I don't have to use play_song as very first command ever ru
+        # initialize empty constructor so I don't have to use play_song as very first command ever run
         self.media = vlc.MediaPlayer()
-    
+  
+
     def play_song(self):
         if (self.media.is_playing()):
             # don't want to do anything if something already playing
@@ -42,9 +44,10 @@ class Xwing:
             self.media = vlc.MediaPlayer(self.path+"/"+self.music_list[self.counter])
             self.media.play()
             self.media.audio_set_volume(50)
-            ### TO DO:
-            # After a song is done playing, it loops back around again
-            # so I want to make sure it stops when the song is over
+
+            # start a new thread to check the playback status
+            self.thread = threading.Thread(target=self.check_playback_status)
+            self.thread.start()
 
     def is_playing(self):
         return self.media.is_playing()
@@ -58,6 +61,16 @@ class Xwing:
             return True
         else:
             return False
+
+    def check_playback_status(self):
+        while True:
+            if not self.is_playing():
+                print(f"state = {self.media.get_state()}")
+                if self.media.get_state() == vlc.State.Ended:
+                    print(f"Song finished playing")
+                    self.release()
+                    break
+            time.sleep(0.5)
 
     def increase_counter(self):
         self.counter += 1
