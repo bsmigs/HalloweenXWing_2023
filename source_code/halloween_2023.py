@@ -8,8 +8,6 @@ import threading
 import os
 import numpy as np
 from xwing import Xwing
-#from pynput import keyboard
-#from sshkeyboard import listen_keyboard, stop_listening
 from evdev import InputDevice, list_devices, categorize, ecodes
 
 # define bounce time
@@ -89,6 +87,8 @@ def take_external_keypad_input():
                     xwing.previous_song()
                 elif (key_event.keycode == "KEY_KP6"):
                     xwing.next_song()
+                elif (key_event.keycode == "KEY_KP7"):
+                    xwing.change_looping_status()
                 elif (key_event.keycode == "KEY_KP5"):
                     if (music_state == "resume"):
                         xwing.pause_song()
@@ -169,14 +169,16 @@ def play_sounds(instance_number):
                         first_time_thru = False
                         print("FIRST TIME THRU")
                     else:
-                        if (xwing.is_song_over()):
-                            xwing.increase_counter()
-                            xwing.play_song()
+                        if (xwing.did_song_end()):
+                            #xwing.release()
+                            #xwing.change_counter("inc")
+                            #xwing.play_song()
+                            xwing.next_song()
                             print("INCREMENTED SONG")
-			            #else:
-			                #print("WAITING FOR SONG TO END")
+                        else:
+                            print("WAITING FOR SONG TO END")
                 
-        time.sleep(0.1)
+        time.sleep(0.15)
 
 
 try:
@@ -194,14 +196,31 @@ try:
     lcd.clear()
 
 	# setup the keyboard and be prepared to listen for user input
-    #take_external_keypad_input()
     thread = threading.Thread(target=take_external_keypad_input)
     threads.append(thread)
     thread.start()
 
+    thread_launched = False
+
     while True:
         # run the target range LCD
         lcd_counter = activate_range_counter(lcd_counter)
+       
+        if (xwing.is_playing() and not thread_launched):
+            playback_check_thread = threading.Thread(target=xwing.check_playback_status())
+            playback_check_thread.start()
+            thread_launched = True
+        if (xwing.did_song_end() and thread_launched):      
+            if (xwing.is_looping):
+                # if we're looping, just go to the next song
+                xwing.next_song()
+            else:
+                # release the memory and join the thread back to the pool
+                playback_check_thread.join()
+                xwing.release()
+                thread_launched = False
+                print(f"Song over and joining thread")
+
         time.sleep(0.15)
 
 except KeyboardInterrupt:
