@@ -7,6 +7,7 @@ import random
 import threading
 import os
 import numpy as np
+import serial
 from pynput import keyboard
 from xwing import Xwing
 
@@ -192,6 +193,14 @@ def play_sounds(instance_number):
 try:
     print(f"GPIO version = {GPIO.VERSION}") 
 	
+    # define a serial object to receive status regarding
+    # whether or not the button to spin R2D2 was pushed.
+    # Need to make sure I am using the correct string for the "Rx"
+    # GPIO pin on the RPi
+    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+    # flush out any crap in the buffer
+    ser.reset_input_buffer()
+
     # define threads to use so I can layer sounds on top of music
     threads = []
     for ii in range(0,3):
@@ -211,6 +220,18 @@ try:
         # run the target range LCD
         lcd_counter = activate_range_counter(lcd_counter)
         time.sleep(0.05)
+
+        ### NEW PIECE TO ACCOMMODATE SERIAL COMMS WITH ARDUINO
+        # check buffer to see if Arduino said anything
+        number = ser.read()
+        # Arduino will send bytes over. If it's empty it will just equal b''
+        if number != b'':
+            # if we get an 18 from the Arduino (totally arbitrary -- I just
+            # needed to send some kind of signal that the button was pushed)
+            if int.from_bytes(number, byteorder='big') == 18:
+                # also play the R2D2 sound
+                play_sounds(0)
+
 
 except KeyboardInterrupt:
     GPIO.cleanup()
