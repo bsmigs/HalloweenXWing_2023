@@ -8,8 +8,8 @@ import threading
 import os
 import numpy as np
 import serial
-from pynput import keyboard
 from xwing import Xwing
+from evdev import InputDevice, list_devices, categorize, ecodes
 
 # define bounce time
 BOUNCETIME = 300 # (ms)
@@ -56,57 +56,49 @@ rows = 2
 # load xwing module I made
 xwing = Xwing("music")
 
-def on_press(key):
-    try:
-        print(f"key {key.char} pressed")
-    except AttributeError:
-        print(f"special key {key} pressed")
+def take_external_keypad_input():
+    devices = [InputDevice(fn) for fn in list_devices()]
+    keypad = devices[0]
+    print(f"Found external keypad device {keypad.name}")
+    for event in keypad.read_loop():
+        if event.type == ecodes.EV_KEY:
+            key_event = categorize(event)
+            if key_event.keystate == key_event.key_down:
+                print(f"Pressed key: {key_event.keycode}")
+            elif key_event.keystate == key_event.key_up:
+                print(f"Released key: {key_event.keycode}")
+                if (key_event.keycode == "KEY_KPENTER"):
+                    xwing.play_song()
+                    music_state = "resume"
+                elif (key_event.keycode == "KEY_KP0"):
+                    if (music_state != "stop"):
+                        xwing.stop_song()
+                        music_state = "stop"
+                elif (key_event.keycode == "KEY_KP8"):
+                    print(f"Increasing volume by +10")
+                    vol = xwing.get_volume()
+                    vol += 10
+                    xwing.set_volume(vol)
+                elif (key_event.keycode == "KEY_KP2"):
+                    print(f"Decreasing volume by -10")
+                    vol = xwing.get_volume()
+                    vol -= 10
+                    xwing.set_volume(vol)
+                elif (key_event.keycode == "KEY_KP4"):
+                    xwing.previous_song()
+                elif (key_event.keycode == "KEY_KP6"):
+                    xwing.next_song()
+                elif (key_event.keycode == "KEY_KP7"):
+                    xwing.change_looping_status()
+                elif (key_event.keycode == "KEY_KP5"):
+                    if (music_state == "resume"):
+                        xwing.pause_song()
+                        music_state = "pause"
+                    elif (music_state == "pause"):
+                        xwing.resume_song()
+                        music_state = "resume"
 
-def on_release(key):
-    # Had to make this a global variable b/c what I think
-    # is going on is that the thread executing this function
-    # lost the scope of music_state. With it now as a
-    # global variable it remembers it
-    global music_state
 
-    #print(f"key {key} released")
-    if key == keyboard.KeyCode(char="8"):
-        # raise the volume by +10
-        print(f"Increasing volume by +10")
-        vol = xwing.get_volume()
-        vol += 10
-        xwing.set_volume(vol)
-    elif key == keyboard.KeyCode(char="2"):
-        # lower the volume by -10
-        vol = xwing.get_volume()
-        vol -= 10
-        xwing.set_volume(vol)
-        print(f"Decreasing volume by -10")
-    elif key == keyboard.Key.enter:
-        # play the current song
-        xwing.play_song()
-        music_state = "resume"
-    elif key == keyboard.KeyCode(char="4"):
-        # play the previous song
-        xwing.previous_song()
-    elif key == keyboard.KeyCode(char="6"):
-        # pay the next song
-        xwing.next_song()
-    elif key == keyboard.KeyCode(char="0"):
-        # stop playing any song
-        if (music_state != "stop"):
-            xwing.stop_song()
-            music_state = "stop"
-    elif key == keyboard.KeyCode(char="5"):
-        # if the music is initially playing
-        # then pause it. If it's paused, then
-        # resume playing
-        if (music_state == "resume"):
-            xwing.pause_song()
-            music_state = "pause"
-        elif (music_state == "pause"):
-            xwing.resume_song()
-            music_state = "resume"
 
 def activate_range_counter(lcd_counter):
     # Make the top row of the LCD say "Range (km)"
@@ -180,27 +172,42 @@ def play_sounds(instance_number):
                         first_time_thru = False
 			            #print("FIRST TIME THRU")
                     else:
-                        if (xwing.is_song_over()):
-                            xwing.increase_counter()
-                            xwing.play_song()
-			                #print("INCREMENTED SONG")
-			            #else:
-			                #print("WAITING FOR SONG TO END")
+                        if (xwing.did_song_end()):
+                            xwing.next_song()
+                            print("INCREMENTED SONG")
+                        else:
+                            print("WAITING FOR SONG TO END")
                 
         time.sleep(0.1)
+
+
+# define a serial object to Rx status regarding
+# whether or not the button to spin R2D2 was
+# pushed
+ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)
+# flush out any crap in the buffer
+ser.reset_input_buffer()
+
+def make_R2D2_squeak_while_spinning():
+    r2d2 = Xwing("r2d2")
+    
+    while True:
+        # check the buffer
+        number = ser.read()
+        print(f"number = {number}")
+
+        # if Arduino doesn't send any bytes over it'll be empoty
+        if number != b'':
+            if int.from_bytes(number, byteorder='big') == 18:
+                r2d2.next_song()
+                ser.reset_input_buffer()
+
+        time.sleep(0.05)
 
 
 try:
     print(f"GPIO version = {GPIO.VERSION}") 
 	
-    # define a serial object to receive status regarding
-    # whether or not the button to spin R2D2 was pushed.
-    # Need to make sure I am using the correct string for the "Rx"
-    # GPIO pin on the RPi
-    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-    # flush out any crap in the buffer
-    ser.reset_input_buffer()
-
     # define threads to use so I can layer sounds on top of music
     threads = []
     for ii in range(0,3):
@@ -212,31 +219,43 @@ try:
     lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
     lcd.clear()
 
-	# setup the keyboard and be prepared to listen for user input
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-    listener.start()
-    
+    # setup the keyboard and be prepared to listen for user input
+    thread = threading.Thread(target=take_external_keypad_input)
+    threads.append(thread)
+    thread.start()
+
+    thread_launched = False
+
+    # define a thread for the spinning/R2D2 sounds
+    sound_spin_thread = threading.Thread(target=make_R2D2_squeak_while_spinning)
+    sound_spin_thread.start()
+
     while True:
         # run the target range LCD
         lcd_counter = activate_range_counter(lcd_counter)
         time.sleep(0.05)
 
-        ### NEW PIECE TO ACCOMMODATE SERIAL COMMS WITH ARDUINO
-        # check buffer to see if Arduino said anything
-        number = ser.read()
-        # Arduino will send bytes over. If it's empty it will just equal b''
-        if number != b'':
-            # if we get an 18 from the Arduino (totally arbitrary -- I just
-            # needed to send some kind of signal that the button was pushed)
-            if int.from_bytes(number, byteorder='big') == 18:
-                # also play the R2D2 sound
-                play_sounds(0)
+        if (xwing.is_playing() and not thread_launched):
+            playback_check_thread = threading.Thread(target=xwing.check_playback_status())
+            playback_check_thread.start()
+            thread_launched = True
+        if (xwing.did_song_end() and thread_launched):
+            if (xwing.is_looping):
+                # if we're looping, just go to the next song
+                xwing.next_song()
+            else:
+                # release the memory and join the thread back to the pool
+                playback_check_thread.join()
+                xwing.release()
+                thread_launched = False
+                print(f"Song over and joining thread")
+
 
 
 except KeyboardInterrupt:
     GPIO.cleanup()
-    listener.join()
     lcd.clear()
+    sound_spin_thread.join()
     for thread in threads:
         thread.join()
 
