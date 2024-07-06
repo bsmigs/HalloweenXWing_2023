@@ -36,10 +36,10 @@ lastTimeEngineButtonPressed = 0
 lastTimeR2D2ButtonPressed = 0
 
 # define lcd counter
-lcd_counter = 10000
+#lcd_counter = 10000
 
 # track if the song started or stopped
-music_state = "resume"
+#music_state = "resume"
 
 # load correct LCD pins (as GPIO.BOARD = physical pin numbering)
 # Cannot use physical pin 15 (GPIO22) since this is used by DigiAmp+
@@ -59,6 +59,10 @@ xwing = Xwing("music")
 def take_external_keypad_input():
     devices = [InputDevice(fn) for fn in list_devices()]
     keypad = devices[0]
+
+    # enable the num lock
+    keypad.set_led(ecodes.LED_NUML, 1)
+    
     print(f"Found external keypad device {keypad.name}")
     for event in keypad.read_loop():
         if event.type == ecodes.EV_KEY:
@@ -86,8 +90,10 @@ def take_external_keypad_input():
                     xwing.set_volume(vol)
                 elif (key_event.keycode == "KEY_KP4"):
                     xwing.previous_song()
+                    music_state = "resume"
                 elif (key_event.keycode == "KEY_KP6"):
                     xwing.next_song()
+                    music_state = "resume"
                 elif (key_event.keycode == "KEY_KP7"):
                     xwing.change_looping_status()
                 elif (key_event.keycode == "KEY_KP5"):
@@ -100,34 +106,42 @@ def take_external_keypad_input():
 
 
 
-def activate_range_counter(lcd_counter):
-    # Make the top row of the LCD say "Range (km)"
-    # Make the bottom row be a rapidly decreasing counter
-	# such that when it hits 0, it wraps back around
-	# again at the highest starting value
-	lcd.clear()
-	lcd.cursor_pos = (0,1)
-	lcd.write_string(u'Target Range')
-	lcd.lf()
-	lcd.cursor_pos = (1,5)
-	value = f'{lcd_counter}'
-	if (lcd_counter == 10000):
-		lcd.write_string(value)
-	elif (lcd_counter < 10000 and lcd_counter >= 1000):
-		lcd.write_string(value+' m')
-	elif (lcd_counter < 1000 and lcd_counter >= 100):
-		lcd.write_string(value+' m ')
-	elif (lcd_counter < 100 and lcd_counter >= 10):
-		lcd.write_string(value+' m  ')
-	elif (lcd_counter < 10 and lcd_counter >= 1):
-		lcd.write_string(value+' m   ')
-	elif (lcd_counter == 0):
-		lcd.write_string(u'BOOM!!!')
-	#time.sleep(10)
-	lcd_counter -= 1
-	lcd_counter = np.mod(lcd_counter, 10000)
+def activate_range_counter():
+    # initialize the LCD using the pins
+    lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
+    lcd.clear()
+    
+    lcd_counter = 10000
+    while True:
+        # Make the top row of the LCD say "Range (km)"
+        # Make the bottom row be a rapidly decreasing counter
+        # such that when it hits 0, it wraps back around
+        # again at the highest starting value
+        lcd.clear()
+        lcd.cursor_pos = (0,1)
+        lcd.write_string(u'Target Range')
+        lcd.lf()
+        lcd.cursor_pos = (1,5)
+        value = f'{lcd_counter}'
+        if (lcd_counter == 10000):
+            lcd.write_string(value)
+        elif (lcd_counter < 10000 and lcd_counter >= 1000):
+            lcd.write_string(value+' m')
+        elif (lcd_counter < 1000 and lcd_counter >= 100):
+            lcd.write_string(value+' m ')
+        elif (lcd_counter < 100 and lcd_counter >= 10):
+            lcd.write_string(value+' m  ')
+        elif (lcd_counter < 10 and lcd_counter >= 1):
+            lcd.write_string(value+' m   ')
+        elif (lcd_counter == 0):
+            lcd.write_string(u'BOOM!!!')
+            time.sleep(10)
+        #time.sleep(10)
+        lcd_counter -= 1
+        lcd_counter = np.mod(lcd_counter, 10000)
 
-	return lcd_counter
+        time.sleep(0.05)
+	#return lcd_counter
 
 
 def play_sounds(instance_number):
@@ -194,7 +208,7 @@ def make_R2D2_squeak_while_spinning():
     while True:
         # check the buffer
         number = ser.read()
-        print(f"number = {number}")
+        #print(f"number = {number}")
 
         # if Arduino doesn't send any bytes over it'll be empoty
         if number != b'':
@@ -212,28 +226,30 @@ try:
     threads = []
     for ii in range(0,3):
         thread = threading.Thread(target=play_sounds, args=(ii,))
-        threads.append(thread)
         thread.start()
+        threads.append(thread)
 
-	# initialize the LCD using the pins
-    lcd = CharLCD(numbering_mode=GPIO.BOARD, cols=columns, rows=rows, pin_rs=rs, pin_e=e, pins_data=[d4,d5,d6,d7])
-    lcd.clear()
-
+    # setup an lcd counter thread
+    lcd_thread = threading.Thread(target=activate_range_counter)
+    lcd_thread.start()
+    threads.append(lcd_thread)
+	
     # setup the keyboard and be prepared to listen for user input
     thread = threading.Thread(target=take_external_keypad_input)
-    threads.append(thread)
     thread.start()
+    threads.append(thread)
 
     thread_launched = False
 
     # define a thread for the spinning/R2D2 sounds
     sound_spin_thread = threading.Thread(target=make_R2D2_squeak_while_spinning)
     sound_spin_thread.start()
+    threads.append(sound_spin_thread)
 
     while True:
         # run the target range LCD
-        lcd_counter = activate_range_counter(lcd_counter)
-        time.sleep(0.05)
+        #lcd_counter = activate_range_counter(lcd_counter)
+        #time.sleep(0.05)
 
         if (xwing.is_playing() and not thread_launched):
             playback_check_thread = threading.Thread(target=xwing.check_playback_status())
@@ -250,12 +266,12 @@ try:
                 thread_launched = False
                 print(f"Song over and joining thread")
 
-
+        time.sleep(0.05)
 
 except KeyboardInterrupt:
     GPIO.cleanup()
-    lcd.clear()
-    sound_spin_thread.join()
+    #lcd.clear()
+    #sound_spin_thread.join()
     for thread in threads:
         thread.join()
 
