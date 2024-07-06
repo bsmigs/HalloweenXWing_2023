@@ -61,10 +61,6 @@ class Xwing:
             print(f"Current volume = {self.curr_volume}")
             self.media.audio_set_volume(self.curr_volume)
             self.is_released = False
-<<<<<<< HEAD
-=======
-
->>>>>>> devel
 
     def is_playing(self):
         return self.media.is_playing()
@@ -143,10 +139,6 @@ class Xwing:
 
     def get_volume(self):
         return self.curr_volume
-<<<<<<< HEAD
-        #return self.media.audio_get_volume()
-=======
->>>>>>> devel
        
     
         
