@@ -44,7 +44,11 @@ class Xwing:
         # to 0 again
         self.curr_volume = 75
 
+<<<<<<< HEAD
         # initialize empty constructor so I don't have to use play_song as very first command ever run
+=======
+        # initialize empty constructor so I don't have to use play_song as very first command ever ru
+>>>>>>> devel
         self.media = vlc.MediaPlayer()
 
     def play_song(self):
@@ -57,6 +61,10 @@ class Xwing:
             print(f"Current volume = {self.curr_volume}")
             self.media.audio_set_volume(self.curr_volume)
             self.is_released = False
+<<<<<<< HEAD
+=======
+
+>>>>>>> devel
 
     def is_playing(self):
         return self.media.is_playing()
@@ -135,7 +143,10 @@ class Xwing:
 
     def get_volume(self):
         return self.curr_volume
+<<<<<<< HEAD
         #return self.media.audio_get_volume()
+=======
+>>>>>>> devel
        
     
         
