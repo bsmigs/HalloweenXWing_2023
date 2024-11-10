@@ -12,13 +12,7 @@ class Xwing:
         self.label = label
         self.song_playing = False
         if (label == "music"):
-            # make sure DigiAmp+ is unmuted
-            #self.unmuted = False
             self.path = "/home/pi/repos/HalloweenXWing_2023/Empire_Strikes_Back_Soundtrack"
-			#if (not self.unmuted):
-            #    os.system('dtoverlay=rpi-digiampplus,unmute_amp')
-            #    os.system('dtoverlay=iqaudio-digiampplus,unmute_amp')
-            #    self.unmuted = True 
         elif (label == "r2d2"):
             self.path = "/home/pi/repos/HalloweenXWing_2023/r2d2_sounds_mp3s"
         elif (label == "gun"):
@@ -114,13 +108,15 @@ class Xwing:
             self.release()
         
     def next_song(self):
-        self.stop_song()
+        if (self.media.get_state() != vlc.State.Stopped):
+            self.stop_song()
         self.change_counter("inc")
         print(f"counter={self.counter}")
         self.play_song()
         
     def previous_song(self):
-        self.stop_song()
+        if (self.media.get_state() != vlc.State.Stopped):
+            self.stop_song()
         self.change_counter("dec")
         print(f"counter={self.counter}")
         self.play_song()

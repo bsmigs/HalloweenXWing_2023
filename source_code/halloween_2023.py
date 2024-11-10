@@ -50,7 +50,11 @@ rows = 2
 # load xwing module I made
 xwing = Xwing("music")
 
+music_state = "stop"
+
 def take_external_keypad_input():
+    global music_state
+
     devices = [InputDevice(fn) for fn in list_devices()]
     keypad = devices[0]
 
@@ -77,11 +81,13 @@ def take_external_keypad_input():
                     vol = xwing.get_volume()
                     vol += 10
                     xwing.set_volume(vol)
+                    music_state = "resume"
                 elif (key_event.keycode == "KEY_KP2"):
                     print(f"Decreasing volume by -10")
                     vol = xwing.get_volume()
                     vol -= 10
                     xwing.set_volume(vol)
+                    music_state = "resume"
                 elif (key_event.keycode == "KEY_KP4"):
                     xwing.previous_song()
                     music_state = "resume"
